@@ -19,6 +19,8 @@ See also our [arXiv paper](https://arxiv.org/abs/1912.02164), [blog post](https:
 
 ## Setup
 
+Install Python 3.8.16, then in that environment run
+
 ```bash
 pip install -r requirements.txt
 ```
