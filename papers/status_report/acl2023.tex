@@ -1,0 +1,128 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs across lines.
+
+\documentclass[12pt]{article}
+
+% Remove the "review" option to generate the final version.
+\usepackage[]{ACL2023}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out.
+% However, it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+
+% If the title and author information does not fit in the area allocated, uncomment the following
+%
+%\setlength\titlebox{<dim>}
+%
+% and set <dim> to something 5cm or larger.
+
+\title{Status Report Group 5}
+
+% Author information can be set in various styles:
+% For several authors from the same institution:
+% \author{Author 1 \and ... \and Author n \\
+%         Address line \\ ... \\ Address line}
+% if the names do not fit well on one line use
+%         Author 1 \\ {\bf Author 2} \\ ... \\ {\bf Author n} \\
+% For authors from different institutions:
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \And  ... \And
+%         Author n \\ Address line \\ ... \\ Address line}
+% To start a seperate ``row'' of authors use \AND, as in
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \AND
+%         Author 2 \\ Address line \\ ... \\ Address line \And
+%         Author 3 \\ Address line \\ ... \\ Address line}
+
+\author{Cameron Franklin \\
+\texttt{ccf91412@usc.edu} \And
+Vivian Sau \\
+\texttt{vsau@usc.edu} \And
+Maxwell Waugaman \\
+\texttt{mwaugama@usc.edu} \AND
+Che Wei Wu \\
+\texttt{cheweiwu@usc.edu} \And
+Nelson Yang \\
+\texttt{nelsonya@usc.edu} \AND
+\affil{Department of Computer Science \\
+University of Southern California \\
+Los Angeles, CA 90089 }}
+
+\begin{document}
+{\maketitle}
+
+\section{Tasks Performed}
+We are currently exploring two ways to augment the existing GPT-2 model.  We will compare the outcomes of the two methods to find which is better able to generate a tweet that matches the sentiment we are aiming for.  One method being explored is: Using LSTM, we can generate a seed for GPT-2 to build on top of. The other is: Using discriminators, we can attempt to steer GPT-2 to generate tweets closer to our desired sentiment.\footnote{\citep{DBLP:journals/corr/abs-1912-02164}}
+
+As a group we have aggregated our project workload into five high-level tasks: 
+- Performing data cleaning/preprocessing and creating input tensors for our models
+- Implementing the model training loops
+- Creating a module to generate tweets from the GPT-2 APIs
+- Researching existing papers regarding our topics to establish a baseline
+- Creating a model to perform automated validation on our model
+Each task will obviously require several subtasks to complete and as a group we will assist each other in these various subtasks as needed; but we have decided to delegate responsibilities by assigning each group member one of these five main tasks to oversee (see individual contribution section for more detail).
+
+We read the “Plug and Play” (Dathathri et. al 2020)  paper for controlled generation and reviewed its code published on Github. This paper has been identified as a key reference, and we plan to use its generation technique as a baseline for our research. The simplest model they implement in the paper uses Bag of Words (BoW) to alter the latent state of GPT-2. We have identified this as a possible starting point for reference implementation. In addition, we have researched some of their methods for evaluation and related work. 
+
+As of this point, the cleaning/preprocessing step of the first task has been completed on our dataset, and we are currently in the midst of converting our data into numerical representations/tensors for training the model. This task is not blocking the implementation of the model training loops.
+
+To evaluate using GPT-2 with a supplied seed, we’ve started developing an LSTM model to generate prompts that we can use as seeds to feed into GPT-2 using Keras. This is based off of a Trump Tweet generator.\footnote{\citep{morris_nevinchana_tam_2020}}\footnote{\citep{levy_2019}}  After the data prepared data is plugged in, we will do some manual evaluation of the generated prompts before plugging it into GPT-2.  This will allow us to adjust hyperparameters on the prompt-generator.  We’ve defaulted to using an Adam optimizer with Cross Entropy as our loss function.
+
+To interact with GPT-2, we are assessing two methods:
+The first is pipelines from the Transformer python library. The pipelines are objects that abstract most of the complex code from the library. It is a simple API dedicated to tasks such as Name Entity Recognition, Sentiment Analysis, Masked Language Modeling, and Feature Extraction. In the algorithm, we specify a task identifier and a model. In our case, it will be text generation and GPT-2 respectively. We simply provide a prompt such as "tomorrow will be" and the generator will provide n results starting with the prompt. An example output is: "Tomorrow will be an amazing season for the club as well, which, frankly, includes plenty of chances to see them improve against West Ham". 
+The second approach is to directly make a http request to the OpenAI GPT-2 API to generate the text from the snippet. Here, we specify an API endpoint and a model. We used the completion endpoint and GPT-3 davinci model. We can also specify the maximum token. Using the same example "Tomorrow will be", this model outputs "Tomorrow will be a better day. I'm sure it will. I'm sure you'll be just fine".
+
+We initially aimed to use traditional evaluation metrics such as BLEU for assessing the quality of generated tweets. However, during our investigation\footnote{\citep{leiter2022explainable}}, we discovered the importance of sentiment accuracy and the necessity of evaluating the coherence and relevance of generated sentences. We are now evaluating computationally efficient variants of BERT (e.g. DistilBERT, TinyBERT), that can capture the complexities of sentiment analysis while reducing resource requirements.
+
+\section{Risks and Challenges}
+While taking the time to understand the Plug and Play models, we wanted to explore the idea of using LSTM as a seed to guide GPT-2 generation.  We run the risk of doing throw-away work.  However, this was calculated so that we can make sure to test out multiple avenues of addressing our problem statement.
+
+We are anticipating several risks/challenges during the development of our project. Among them include generating an adequate enough text/tweet snippet to feed into GPT-2 model to produce the full tweet. This will largely depend on the effectiveness of our LSTM model in conjunction with our module for generating the actual snippet.
+
+A potential risk we may face is the generation of biased tweets. Since the training data used to train the models contain unfiltered content from the internet, it does not distinguish between facts and friction. An example of racial bias is giving the model a prompt of “The White man worked as a” and some of GPT’s response are: “a mannequin, maniser, plumber, and journalist”.
+
+A challenge we encountered was using Keras. Keras is not used in class, so this involved a bit of a learning curve.  The resources[3] used to understand LSTM generation were based on Keras, so it seems worth the effort to learn.
+
+A risk identified in our model evaluation is that sentiment analysis can be susceptible to subtle changes in language, such as negations, sarcasm, or even different ways of expressing the same sentiment
+
+\section{Plans to Mitigate Risks}
+We’ve taken several steps in regards to mitigating the aforementioned risks and challenges.  
+
+To prevent bias and generation of offensive tweets, we can restrict users from including race, gender, religion, age, and other protected attributes in the prompt. 
+
+To mitigate the risks posed by our model evaluation we plan to incorporate adversarial training techniques\footnote{\citep{karimi2020adversarial}} to improve the model's robustness against different linguistic variations.
+
+\section{Individual Contribution}
+As mentioned, we have agreed to divide the major tasks in this project by assigning each one to a member in our group. The tasks and assignments are as follows: \\
+Cameron - Create tensors for data \\
+Vivian - create module to generate tweets from a prompt \\
+Max - Researching and finding baseline metrics to compare out output against \\
+Che Wei - Create a model to perform automated validation \\
+Nelson - Working on training loop for LSTM model\\\
+All members have worked towards their respective tasks as well as contributed to the above sections. 
+
+\bibliography{custom}
+\bibliographystyle{acl_natbib}
+
+\end{document}

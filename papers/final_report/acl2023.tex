@@ -1,0 +1,198 @@
+\pdfoutput=1
+\documentclass[11pt]{article}
+\usepackage[]{ACL2023} % Remove the "review" option to generate the final version.
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+
+\setlength\titlebox{7.5cm}
+
+\title{Controlled Tweet Generation using Plug and Play Language Models}
+
+\author{Cameron Franklin \\
+\texttt{ccf91412@usc.edu} \And
+Vivian Sau \\
+\texttt{vsau@usc.edu} \And
+Maxwell Waugaman \\
+\texttt{mwaugama@usc.edu} \AND
+Che Wei Wu \\
+\texttt{cheweiwu@usc.edu} \And
+Nelson Yang \\
+\texttt{nelsonya@usc.edu} \AND
+\affil{Department of Computer Science \\
+University of Southern California \\
+Los Angeles, CA 90089 }}
+
+\begin{document}
+{\maketitle}
+
+\begin{abstract}
+This project explored the performance of  Plug and Play Language Models\footnote{\citep{pplm-paper}} trained against a corpus of only tweets subject to Twitter imposed character limits and content moderation.  We train a custom discriminator to guide text generation towards positive and negative sentiments based on a corpus of tweets. This is compared against a baseline of a pre-trained sentiment discriminator, SST\footnote{\citep{sst-paper}}.  We can see that, given the constraints of the Twitter platform, PPLM models performed worse when prompted with tweet prefixes, both in accuracy and fluency.  However, the discriminator trained on tweet-specific data outperformed the baseline SST model.
+\end{abstract}
+
+\section{Introduction}
+Tweets are relatively short and often contain strong sentiment. A user may tweet about something they love or dislike. Additionally, tweets must be generated quickly to respond to live events. Text generation can provide users with creative ideas for describing their feelings and help augment writing timely tweets. Algorithms for generating sentences have improved substantially and become capable of generating short, comprehensible messages which are difficult to distinguish from human text. In this project, we explore using Plug and Play Language models to generate tweets containing a desired sentiment. This approach eliminates the need to fine-tune a large language model, thereby lowering the cost of development while maintaining useful output.
+
+
+\section{Related Work}
+\subsection{Plug and Play Language Models\footnote{\citep{pplm-paper}}}
+Given an auto-regressive decoder, GPT-2, users are able to plug in supplemental attribute models to steer generation of the model.  This allows users to modify large unconditional LMs \begin{math}p(x)\end{math} without having to retrain the entire model.  This is done by training a conditional model \begin{math}p(x|a)\end{math}p(x|a).  To get this conditional model, an attribute model is trained by taking a sentence \begin{math}x\end{math} and computing the probability it has attribute \begin{math}a\end{math}, \begin{math}p(a|x)\end{math}.  Then, using Baye’s rule, we can get the conditional model \begin{math}p(x|a) \propto p(x)p(a|x)\end{math}.  Bag of Words is one attribute model that can be used for PPLM.  In this project, a discriminator model is evaluated for use on sentiments.
+
+\subsection{Stanford Sentiment Treebank\footnote{\citep{sst-paper}}}
+Prior to the Stanford Sentiment Treebank, semantic words were used to detect sentiment.  This was not effective across longer sentences and phrases.  The SST was created to fill this gap.  The SST is a dataset based heavily on movie reviews.  The creators split the reviews into phrases which were then annotated manually.  PPLM uses the SST dataset by default in order to train discriminators to guide text generation using sentiment. SST is the baseline we are evaluating against
+
+\subsection{TweetEval\footnote{\citep{tweet-eval-paper}}}
+TweetEval is a unified tweet classifier.  It aims to be a singular library that can classify tweets on seven different benchmarks: emotion recognition, emoji detection, irony detection, hate speech detection, offensive language identification, sentiment analysis, and stance detection.  TweetEval uses the RoBERTa\footnote{\citep{roberta-paper}} language model, an evolution on the BERT language model.  In this project, we use TweetEval to perform automated evaluation of our generated tweets.
+
+
+\section{Problem Description}
+\begin{table*}
+\centering
+\begin{tabular}{llp{0.6\textwidth}}
+\toprule
+\multicolumn{2}{c}{\textbf{Input}} & \textbf{Output}\\
+{Prefix} & {Sentiment} \\
+\midrule
+{“I ran a mile today”} & {Positive} & {“I ran a mile today and set a new personal best! Six minute mile, here I come!”} \\
+{“I ran a mile today”} & {Negative} & {“I ran a mile today. I have never been so sore and bored. There is no way I’m doing that again.”} \\
+\bottomrule
+\end{tabular}
+\caption{Given the same prefix with different sentiments, output is steered towards the sentiment.}
+\label{tab:tweets}
+\end{table*}
+The objective of our project is to produce a controllable, text-generating Twitter bot that effectively outputs tweets when given a prefix and positive or negative sentiment as input. See Table~\ref{tab:tweets} for an example of controlled generation given sentiment.
+
+A tweet must be 280 characters or less, so the output must be within that limit.
+
+We intend to evaluate the Plug and Play method for this task, so we may not retrain or fine tune any large language models as part of the process. We use the same GPT-2 medium (345M) language model used by the original Plug and Play paper. The dataset of interest is a sentiment annotated tweet dataset
+
+
+\section{Methods}
+\subsection{Dataset Cleaning and Preprocessing}
+Prior to training, we performed several operations to clean and preprocess our dataset. We used a Sentiment140 Dataset\footnote{\citep{sentiment140-kaggle}}. The dataset was originally created as part of a research project at Stanford University, and was generated using the Twitter API. It contains 1.6 million sentiment-annotated tweets, with a binary classification of sentiment as either positive (denoted by the integer 4) or negative (denoted by the integer 0). There were other fields included in the dataset such as target ids, date, and user among others; but for the sake of our project we only used the “target” field (which defines the polarity of the tweet as either positive or negative, with there also being a third option of neutral which we chose not to consider) and the “text” field (which contains the content of the tweet). 
+
+We wrote a Python script to perform data cleaning and preprocessing steps such as contraction expansion, HTML and URL removal, non-alphabetic character removal, converting text to lowercase, tokenization, stop word removal, lemmatization, and excess whitespace removal. 
+
+In retrospect, we were able to conclude that username removal was a step that could’ve been beneficial to include in pre-processing, as it did noticeably affect the results of our model and is something we would change in future iterations of the project. We also think a baseline toxicity/hate speech filter should’ve been applied to the dataset as a safeguard against inputting offensive or sensitive data into our model. 
+
+\subsection{Discriminator Training}
+To train a discriminator, we feed the preprocessed, annotated tweet data into the provided PPLM discriminator trainer\footnote{\citep{pplm-git}}.  The encoder used by the training script is gpt2-medium.  We run the trainer for 5 epochs and store that output as a model to plug into the language models.  Some default hyperparameters (used also when training against SST) include:
+\begin{quote}
+\begin{verbatim}
+Batch Size: 64
+Learning Rate: 0.0001
+\end{verbatim}
+\end{quote}
+
+\subsection{Tweet Generation}
+Tweets are generated with our baseline SST discriminator using a similar method to our Sentiment140 discriminator. The experiment was set up by providing 500 “positive” prompts and 500 “negative” prompts.  For each prompt, a random “seed” is provided by taking the first 3-5 words of a tweet in our training data.  Then, for each of these tweets, we supply it to the PPLM script. The script generates both perturbed and unperturbed text, from which we take the former. The hyperparameters used for both the SST baseline as well as our custom discriminator are:
+\begin{quote}
+\begin{verbatim}
+Maximum Tweet Length: 40 words
+Gamma: 1.0
+Number of Iterations: 3
+Step Size: 0.04
+KL-Loss Coefficient: 0.01
+GM Scale: 0.95
+\end{verbatim}
+\end{quote}
+
+\subsection{Perplexity Evaluation}
+Each generated tweet was automatically evaluated for perplexity using metric implementation from the Transformers library \footnote{\url{https://huggingface.co/spaces/evaluate-measurement/perplexity}}. This uses GPT-2 to evaluate the probability of the sentence existing in the test dataset. The average and standard deviation of perplexity across all the generated tweets from the baseline and custom trained discriminator is computed and reported in the results section.
+
+\subsection{Automated Sentiment Evaluation}
+Using a pre-trained sentiment evaluator, RoBERTa\footnote{\citep{roberta-huggingface}}, we evaluate the sentiment of each generated tweet automatically. The generated sentences are passed through the sentiment analysis pipeline, which internally tokenized and preprocesses the sentences before performing sentiment classification. 
+
+The model provided sentiment labels, with neutral cases adjusted to the highest scoring sentiment between positive and negative. By comparing predicted labels with gold standard labels, we calculated performance metrics such as accuracy, precision, recall, and F1-score, offering insights into our model's sentiment generation capabilities.
+
+\subsection{Human Evaluation}
+To supplement the automatic evaluation of the generated tweets, a sample of 150 tweets for each dataset were used to evaluate sentiment and fluency.  
+
+Sentiment was evaluated as Positive, Negative, or Inconclusive.  Accuracy was calculated only on tweets where both the input and evaluated sentiment were the same (inconclusive would be considered wrong).  
+
+Fluency was evaluated on a 1 to 5 scale, where 1 is the least fluent and 5 is the most fluent. To get our final metric, the fluency scores are averaged and a standard deviation calculated.
+
+
+\section{Experiment Setup}
+
+\subsection{Datasets}
+The Sentiment140 dataset\footnote{\citep{sentiment140-kaggle}} was utilized for training the custom discriminator. By training the discriminator on tweet-specific data, we aimed to enhance its ability to guide text generation toward the desired sentiment. 
+
+\subsection{Baseline Methods}
+The pre-trained SST discriminator model represented the baseline for this experiment. As a widely used sentiment discriminator, it enabled us to compare the benefits of our custom discriminator against a well-established model.
+
+\subsection{Evaluation Protocols}
+We designed a multi-faceted evaluation approach to assess the effectiveness of our custom discriminator compared to the SST baseline. This approach included quantitative metrics like perplexity scores, qualitative analysis of generated tweets, evaluation of sentiment control, and human evaluation. To evaluate the sentiment of the sentences generated by the baseline and our custom model, we used a separate pre-trained model, Twitter-RoBERTa-base-latest\footnote{\citep{roberta-huggingface}}. It is a RoBERTa-base model trained on ~124M tweets and fine tuned for sentiment analysis with the TweetEval\footnote{\citep{tweet-eval-paper}} benchmark, which acted as an external sentiment classifier for automated evaluation. 
+
+
+\section{Results and Discussion} 
+\begin{table*}
+\centering
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{Discriminator} & \multicolumn{2}{c}{\textbf{Sentiment Accuracy}} & \textbf{Perplexity} & \textbf{Fluency}\\
+{} & {Human} & {TweetEval} & {} & {}\\
+\midrule
+{SST} & {36.00\%} & {61\%} & \begin{math}18.99\pm15.92\end{math} & \begin{math}2.6\pm1.38\end{math} \\
+\textbf{Sentiment140 Tweets} & \textbf{37.33\%} & \textbf{54\%} & \begin{math}\textbf{19.76}\pm\textbf{15.05}\end{math} & \begin{math}\textbf{2.71}\pm\textbf{1.51}\end{math} \\
+\bottomrule
+\end{tabular}
+\caption{Results of human (Accuracy and Fluency) and automated (Accuracy and Perplexity) evaluation of the baseline SST discriminator against our custom discrimator trained on Sentiment140}
+\label{tab:results}
+\end{table*}
+
+The findings from our experiments (Table~\ref{tab:tweets}) provide insights into the performance of the custom discriminator versus the baseline SST discriminator.
+
+\subsection{Perplexity Scores} 
+The perplexity scores for the custom discriminator and the baseline were found to be similar. While perplexity scores are not directly comparable to the original research paper, these values suggest that there is no significant difference between the custom discriminator and the SST baseline in terms of perplexity.
+
+\subsection{Sentiment Classification Accuracy}
+The baseline model exhibited higher overall accuracy than the custom model in automated evaluation. This further supported the finding that the SST baseline model performed slightly better in sentiment classification accuracy than the custom discriminator.
+
+\subsection{Sentiment Control and Adaptability}
+The custom and SST discriminators' effectiveness in controlling sentiment might be attributed to their training on domain-specific data. For instance, the custom discriminator, trained on tweet-specific data, may better adapt to Twitter's unique features like brevity, slang, and emojis, compared to the SST discriminator, which was trained on other text sources. Further experiments with larger sample sizes and varied prompts can help confirm this observation.
+
+\subsection{Tweet Prefixes and Context Sensitivity}
+The custom discriminator's better performance in contextual sensitivity and fluency using tweet prefixes could be due to its training on a dataset closely related to the target domain. However, this hypothesis should be validated through more rigorous testing, including the use of different input lengths and a range of prefixes. 
+
+\subsection{Summary}
+Our results provide initial evidence that the custom discriminator may have some advantages over the SST baseline in generating tweets with the desired sentiment and adapting to the unique constraints of the Twitter platform. However, these findings should be interpreted with caution, considering the limitations of the evaluation methods employed, as well as the fact that the overall sentiment accuracy and fluency of the generated tweets are not as high as desired. 
+
+
+\section{Conclusions and Future Work}
+
+This project found that the plug and play method can be used to generate sentiment-steered tweets, but further work may be required to improve fluency and tweet quality. The tweets generated by GPT-2 suffered from repetition, limited fluency, and they were very sensitive to the prefix prompt. However, this applied to both the baseline and custom trained discriminator, suggesting a shortcoming in the language model and prompts, not necessarily the plug and play method itself.
+
+The overall sentiment accuracy of the generated tweets is low relative to the research paper (Table~\ref{tab:tweets}), but the custom trained discriminator model did successfully steer the output of GPT-2 toward a desired sentiment for some more fluent tweets. It is difficult to judge the sentiment of a tweet with low fluency, which may have negatively impacted the sentiment accuracy. Moving forward, future work should focus on improving the performance, possibly by incorporating a more advanced language model than GPT-2. Additionally, more work is needed to explore the ethical implications of using such models, especially with regards to the potential for bias and misuse. Several tweets generated with negative sentiment contained offensive language, which may have been influenced by the tweet dataset used to train the discriminator.
+
+Despite its limitations, the model trained in this project can be useful for generating quick and simple language outputs, especially in situations where the quality of the output is not of utmost importance. With a more advanced language model, we may be able to generate more directly usable tweets.
+
+
+
+\section{Individual Contribution}
+\subsection{Cameron Franklin}
+Cameron’s responsibilities included the data-cleaning and preprocessing steps on the raw “Sentiment140 dataset with 1.6 million tweets” data to produce the input for training the discriminator.  He also researched related works, such as the article “Tweet generation with Neural Networks: LSTM and GPT-2”\footnote{\citep{lstm-medium}} which discussed other ways tweet generation can be done with neural networks; we considered the methods at the outset of the project before eventually settling on the Plug and Play approach. 
+
+\subsection{Vivian Sau}
+Vivian contributed to related work research, set up and provided sample outputs on the PPLM code base and sample outputs using our custom discriminator, generated evaluation dataset using the baseline discriminator with 1,000 random prefixes as input from our dataset for auto-sentiment evaluation and human evaluation process, evaluated 30 generated tweets for sentiment and fluency level, and contributed to preparation of presentation slide and presented our research results.
+
+\subsection{Maxwell Waugaman}
+Max performed the initial in-depth read of the PPLM paper\footnote{\citep{pplm-paper}} and tested the vanilla PPLM code\footnote{\citep{pplm-git}}. He created the Git repository for the project and implemented the automated perplexity analysis. Additionally, he contributed to sections of the proposal, presentation, and final project report.
+
+\subsection{Che Wei Wu}
+Che Wei contributed by researching the architecture and technical details proposed in the PPLM paper and explaining its mechanism during the presentation. Additionally, he contributed to the evaluation section of the reports and was responsible for evaluating the generated data from the works of Cameron, Nelson, and Vivian using a script he created.
+
+\subsection{Nelson Yang}
+Nelson trained the discriminators based off of Cameron's output.  He worked closely with Vivian to generate tweets and created the Jupyter notebooks to generate tweets.  Nelson also translated the generated datasets into Excel sheets for manual evaluation.  This allowed the team to generate accuracy and fluency scores. He generated the LaTeX code for and contributed to writing the Status Report and Final Reports.  
+
+\section{\href{https://github.com/MWaug/pplm-cs544-sentitweet}{GitHub Repository}\footnote{\citep{our-code}}}
+
+\bibliography{custom}
+\bibliographystyle{acl_natbib}
+\end{document}
